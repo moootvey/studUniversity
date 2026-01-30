@@ -22,8 +22,8 @@
 
 1. Склонируйте репозиторий:
    ```bash
-    git clone https://github.com/moootvey/Bank_REST.git
-    cd Bank_REST
+    git clone https://github.com/moootvey/studUniversity.git
+    cd studUniversity
    ```
 2. Соберите и запустите проект с помощью Docker Compose:
    ```bash
