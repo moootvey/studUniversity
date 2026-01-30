@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Группы</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-..." crossorigin="anonymous">
+    <style>
+        body { background: #f8f9fa; }
+        .card { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        .controls { gap: 8px; }
+        .table-container { max-height: none; overflow: visible; }
+
+        .control-uniform {
+            height: 40px;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            padding-top: .375rem;
+            padding-bottom: .375rem;
+            line-height: 1;
+        }
+        .control-uniform.form-control {
+            padding-top: .375rem;
+            padding-bottom: .375rem;
+            height: 40px;
+        }
+
+        .controls-row {
+            display: flex;
+            flex-direction: column !important;
+            gap: 1rem;
+            row-gap: .25rem;
+            align-items: stretch;
+        }
+
+        .control-box {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            padding: .5rem;
+            background: #ffffff;
+            width: 100% !important;
+        }
+
+        .control-box .form-control, .control-box .btn {
+            height: 40px;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .control-box .btn {
+            padding: 0 .6rem;
+        }
+
+        .control-box .form-inline .form-control {
+            width: auto;
+            max-width: 360px;
+            min-width: 160px;
+        }
+
+        .control-box .form-inline {
+            gap: .5rem;
+            justify-content: flex-start;
+        }
+
+        @media (max-width: 720px) {
+            .control-box .form-inline .form-control {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .control-box .form-inline { flex-direction: column; align-items: stretch; gap: .5rem; }
+            .control-box .form-inline .btn { width: 100%; padding: 0.375rem 0.75rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container my-4">
+    <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="m-0">Группы университета ScaleApps</h2>
+        </div>
+
+        <div class="table-container mb-3">
+            <table class="table table-hover table-striped">
+                <thead class="table-light">
+                <tr>
+                    <th scope="col">Номер</th>
+                    <th scope="col">Количество студентов</th>
+                    <th scope="col">Действия</th>
+                </tr>
+                </thead>
+                <tbody id="groupsBody">
+                <tr th:each="g, iterStat : ${groups}">
+                    <td th:text="${g.groupNumber}">G001</td>
+                    <td th:text="${g.studentsCount}">0</td>
+                    <td>
+                        <a th:href="@{/groups/{id}(id=${g.groupId})}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-stretch mb-3 flex-wrap controls-row">
+            <div class="control-box">
+                <div class="d-flex controls align-items-center w-100">
+                    <button id="prevBtn" class="btn btn-outline-primary me-2" disabled>Предыдущая</button>
+                    <button id="nextBtn" class="btn btn-outline-primary me-3">Следующая</button>
+                    <div class="input-group me-3" style="width:210px;">
+                        <input id="pageInput" type="number" min="1" class="form-control" placeholder="Страница" />
+                        <button id="goBtn" class="btn btn-secondary">Перейти</button>
+                    </div>
+                    <div class="align-self-center ms-2">
+                        <small id="pageInfo" class="text-muted">Страница <span id="currentPageSpan" th:text="${currentPage}">1</span> из <span id="totalPagesSpan" th:text="${totalPages}">1</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-box">
+                <div class="d-flex form-inline align-items-center w-100 justify-content-start">
+                    <input id="newGroupNumber" class="form-control me-2" placeholder="Номер группы" aria-label="groupNumber" />
+                </div>
+            </div>
+
+            <div class="control-box">
+                <div class="d-flex form-inline align-items-center w-100 justify-content-start">
+                    <button id="addGroupBtn" class="btn btn-success">Добавить новую группу</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="alertPlaceholder"></div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const totalPages = ${totalPages} 1;
+</script>
+
+<script>
+    let currentPage = 1;
+    const total = parseInt((document.getElementById('totalPagesSpan') || {innerText: '1'}).innerText) || 1;
+
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const goBtn = document.getElementById('goBtn');
+    const pageInput = document.getElementById('pageInput');
+    const currentPageSpan = document.getElementById('currentPageSpan');
+    const totalPagesSpan = document.getElementById('totalPagesSpan');
+    const groupsBody = document.getElementById('groupsBody');
+    const addGroupBtn = document.getElementById('addGroupBtn');
+    const newGroupNumber = document.getElementById('newGroupNumber');
+    const alertPlaceholder = document.getElementById('alertPlaceholder');
+    let alertTimeoutId = null; // для автоскрытия
+
+    const TOTAL_PAGES = total;
+    totalPagesSpan.textContent = TOTAL_PAGES;
+    currentPageSpan.textContent = currentPage;
+    updateNavButtons();
+
+    if (pageInput) {
+        pageInput.max = TOTAL_PAGES;
+        pageInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                goBtn.click();
+            }
+        });
+    }
+
+    if (!groupsBody.querySelector('tr')) {
+        fetchPage(1);
+    }
+
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) fetchPage(currentPage - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentPage < TOTAL_PAGES) fetchPage(currentPage + 1);
+    });
+
+    goBtn.addEventListener('click', () => {
+        const val = parseInt(pageInput.value);
+        if (!isNaN(val) && val >= 1 && val <= TOTAL_PAGES) {
+            fetchPage(val);
+        } else {
+            showAlert('Такой страницы нет', 'warning');
+        }
+    });
+
+    addGroupBtn.addEventListener('click', () => {
+        const groupNumber = newGroupNumber.value && newGroupNumber.value.trim();
+        if (!groupNumber) { showAlert('Введите номер группы', 'warning'); return; }
+
+        const body = { groupNumber: groupNumber };
+
+        fetch('/addGroup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+            .then(async resp => {
+                if (!resp.ok) {
+                    const txt = await resp.text();
+                    throw new Error(txt || 'Ошибка при добавлении группы');
+                }
+                return resp.json();
+            })
+            .then(data => {
+                prependGroupRow(data);
+                fetchPage(currentPage);
+                showAlert('Группа добавлена', 'success');
+
+                const gid = (data.id !== undefined ? data.id : (data.groupId !== undefined ? data.groupId : ''));
+                if (gid) {
+                    setTimeout(() => {
+                        window.location.href = `/groups/${encodeURIComponent(gid)}`;
+                    }, 700);
+                } else {
+                    newGroupNumber.value = '';
+                }
+            })
+            .catch(err => {
+                newGroupNumber.value = groupNumber;
+                newGroupNumber.focus();
+                showAlert('Ошибка: ' + err.message, 'danger');
+            })
+            .finally(() => {
+                addGroupBtn.disabled = false;
+            });
+    });
+
+    function fetchPage(pageNumber) {
+        fetch(`/getGroups?page=${pageNumber - 1}`)
+            .then(resp => {
+                if (!resp.ok) throw new Error('Не удалось получить список групп');
+                return resp.json();
+            })
+            .then(data => {
+                renderTable(data);
+                currentPage = pageNumber;
+                currentPageSpan.textContent = currentPage;
+                updateNavButtons();
+            })
+            .catch(err => showAlert('Ошибка: ' + err.message, 'danger'));
+    }
+
+    function renderTable(groups) {
+        groupsBody.innerHTML = '';
+        if (!groups || groups.length === 0) {
+            groupsBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Групп нет</td></tr>';
+            return;
+        }
+        groups.forEach((g, idx) => {
+            const tr = document.createElement('tr');
+
+            const numCell = document.createElement('td');
+            numCell.textContent = g.groupNumber !== undefined ? g.groupNumber : '';
+            const countCell = document.createElement('td');
+            countCell.textContent = g.studentsCount !== undefined ? g.studentsCount : 0;
+
+            const actionCell = document.createElement('td');
+            const gid = (g.id !== undefined ? g.id : (g.groupId !== undefined ? g.groupId : ''));
+            const a = document.createElement('a');
+            a.href = `/groups/${encodeURIComponent(gid)}`;
+            a.className = 'btn btn-sm btn-outline-primary';
+            a.textContent = 'Edit';
+            actionCell.appendChild(a);
+
+            tr.appendChild(numCell);
+            tr.appendChild(countCell);
+            tr.appendChild(actionCell);
+            groupsBody.appendChild(tr);
+        });
+    }
+
+    function prependGroupRow(g) {
+        const tr = document.createElement('tr');
+        const idx = document.createElement('th');
+        idx.scope = 'row';
+        idx.textContent = 1;
+        const numCell = document.createElement('td');
+        numCell.textContent = g.groupNumber !== undefined ? g.groupNumber : '';
+        const countCell = document.createElement('td');
+        countCell.textContent = g.studentsCount !== undefined ? g.studentsCount : 0;
+
+        const actionCell = document.createElement('td');
+        const gid = (g.id !== undefined ? g.id : (g.groupId !== undefined ? g.groupId : ''));
+        const a = document.createElement('a');
+        a.href = `/groups/${encodeURIComponent(gid)}`;
+        a.className = 'btn btn-sm btn-outline-primary';
+        a.textContent = 'Edit';
+        actionCell.appendChild(a);
+
+        tr.appendChild(idx);
+        tr.appendChild(numCell);
+        tr.appendChild(countCell);
+        tr.appendChild(actionCell);
+
+        const rows = groupsBody.querySelectorAll('tr');
+        rows.forEach((r, i) => {
+            const th = r.querySelector('th');
+            if (th) th.textContent = i + 2;
+        });
+
+        groupsBody.insertBefore(tr, groupsBody.firstChild);
+
+        if (groupsBody.children.length > 10) groupsBody.removeChild(groupsBody.lastChild);
+    }
+
+    function updateNavButtons() {
+        prevBtn.disabled = (currentPage <= 1);
+        nextBtn.disabled = (currentPage >= TOTAL_PAGES);
+    }
+
+    function showAlert(message, type = 'info') {
+        alertPlaceholder.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show mt-2" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+
+        if (alertTimeoutId) {
+            clearTimeout(alertTimeoutId);
+            alertTimeoutId = null;
+        }
+
+        alertTimeoutId = setTimeout(() => {
+            const alertEl = alertPlaceholder.querySelector('.alert');
+            if (!alertEl) { alertTimeoutId = null; return; }
+
+            if (window.bootstrap && bootstrap.Alert && typeof bootstrap.Alert.getOrCreateInstance === 'function') {
+                try {
+                    const bsAlert = bootstrap.Alert.getOrCreateInstance(alertEl);
+                    bsAlert.close();
+                } catch (e) {
+                    alertEl.remove();
+                }
+            } else {
+                alertEl.remove();
+            }
+            alertTimeoutId = null;
+        }, 5000);
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-XYZ" crossorigin="anonymous"></script>
+</body>
+</html>

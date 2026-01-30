@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="'Группа ' + ${groupNum}">Группа</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <style>
+        body { background: #f8f9fa; }
+        .card { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        .table-container { max-height: none; overflow: visible; }
+        .controls { gap: 8px; }
+
+        table#studentsTable { table-layout: fixed; width: 100%; }
+        th.col-date, td.col-date {
+            width: 150px;
+            max-width: 150px;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        th.col-name, td.col-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        th.col-actions, td.col-actions {
+            width: 140px;
+            max-width: 140px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .btn-delete-full { width: 100%; }
+
+        .control-uniform {
+            height: 40px;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            padding-top: .375rem;
+            padding-bottom: .375rem;
+            line-height: 1;
+        }
+        .control-uniform.form-control {
+            padding-top: .375rem;
+            padding-bottom: .375rem;
+            height: 40px;
+        }
+
+        .controls-right { flex-direction: column; align-items: flex-start; gap: .5rem; }
+
+        .controls-row {
+            display: flex;
+            flex-direction: column !important;
+            gap: 1rem;
+            align-items: stretch;
+            row-gap: 1rem;
+        }
+
+        .controls-left {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: .5rem;
+            min-height: 48px;
+        }
+
+        .controls-under {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 100%;
+            gap: 1rem;
+        }
+
+        .controls-under .add-row {
+            display: flex;
+            gap: .5rem;
+            width: 480px;
+            max-width: 100%;
+        }
+
+        @media (max-width: 720px) {
+            .controls-left { justify-content: center; }
+            .controls-under .add-row { width: 100%; flex-direction: column; }
+            .controls-under .add-row .control-uniform { width: 100%; }
+        }
+    </style>
+</head>
+<body th:with="studentsList=${studentsDto != null} ? ${studentsDto.students} : ${students},
+               initialPage=${studentsDto != null} ? ${studentsDto.currentPage} : ${currentPage},
+               totalPagesValue=${studentsDto != null} ? ${studentsDto.totalPages} : ${totalPages}">
+<div class="container my-4">
+    <div class="card p-4">
+        <h2 class="mb-3" th:text="'Группа: ' + ${groupNum}">Группа: G000000000</h2>
+
+        <div class="table-container mb-3">
+            <table class="table table-hover table-striped" id="studentsTable">
+                <thead class="table-light">
+                <tr>
+                    <th scope="col" class="col-date">Дата принятия</th>
+                    <th scope="col" class="col-name">ФИО студента</th>
+                    <th scope="col" class="col-actions">Действия</th>
+                </tr>
+                </thead>
+                <tbody id="studentsBody">
+                <tr th:each="s : ${studentsList}">
+                    <td class="col-date" th:text="${s.enrollmentDate != null} ? ${#dates.format(s.enrollmentDate, 'dd.MM.yyyy')} : ''">01.01.2026</td>
+                    <td class="col-name" th:text="${s.studentName}">Иванов И.И.</td>
+                    <td class="col-actions">
+                        <button type="button" class="btn btn-sm btn-danger btn-delete-full delete-btn"
+                                th:attr="data-student-id=${s.studentId}">Удалить</button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex mb-3 controls-row">
+            <div class="d-flex controls align-items-center controls-left">
+                <button id="prevBtn" class="btn btn-outline-primary me-2 control-uniform" disabled>Предыдущая</button>
+                <button id="nextBtn" class="btn btn-outline-primary me-3 control-uniform">Следующая</button>
+
+                <div class="input-group me-3" style="width:210px;">
+                    <input id="pageInput" type="number" min="1" class="form-control control-uniform" placeholder="Страница" />
+                    <button id="goBtn" class="btn btn-secondary control-uniform">Перейти</button>
+                </div>
+
+                <div class="align-self-center">
+                    <small class="text-muted">Страница <span id="currentPageSpan" th:text="${initialPage}">1</span> из <span id="totalPagesSpan" th:text="${totalPagesValue}">1</span></small>
+                </div>
+            </div>
+
+            <div class="controls-under">
+                <div class="d-flex mb-2 add-row">
+                    <input id="newStudentName" class="form-control me-2 control-uniform" placeholder="ФИО" aria-label="studentName" style="width:100%;" />
+                    <button id="addStudentBtn" class="btn btn-success control-uniform">Принять нового студента</button>
+                </div>
+                <div>
+                    <a class="btn btn-secondary control-uniform" th:href="@{/}">Вернуться к списку групп</a>
+                </div>
+            </div>
+        </div>
+
+        <div id="alertPlaceholder"></div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const GROUP_ID = /*[[${groupId}]]*/ 'G000000000';
+    const INITIAL_PAGE = /*[[${initialPage}]]*/ 1;
+    const TOTAL_PAGES = /*[[${totalPagesValue}]]*/ 1;
+</script>
+
+<script>
+    let currentPage = Number(INITIAL_PAGE) || 1;
+    const totalPages = Number(TOTAL_PAGES) || 1;
+    let alertTimeoutId = null;
+
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const goBtn = document.getElementById('goBtn');
+    const pageInput = document.getElementById('pageInput');
+    const currentPageSpan = document.getElementById('currentPageSpan');
+    const totalPagesSpan = document.getElementById('totalPagesSpan');
+    const studentsBody = document.getElementById('studentsBody');
+    const addStudentBtn = document.getElementById('addStudentBtn');
+    const newStudentName = document.getElementById('newStudentName');
+    const alertPlaceholder = document.getElementById('alertPlaceholder');
+
+    totalPagesSpan.textContent = totalPages;
+    currentPageSpan.textContent = currentPage;
+    updateNavButtons();
+
+    if (!studentsBody.querySelector('tr')) {
+        fetchPage(1);
+    }
+
+    studentsBody.addEventListener('click', (e) => {
+        const btn = e.target.closest('.delete-btn');
+        if (!btn) return;
+        const studentId = btn.getAttribute('data-student-id');
+        if (!studentId) return;
+        if (!confirm('Удалить студента?')) return;
+        deleteStudent(studentId);
+    });
+
+    prevBtn.addEventListener('click', () => { if (currentPage > 1) fetchPage(currentPage - 1); });
+    nextBtn.addEventListener('click', () => { if (currentPage < totalPages + 1) fetchPage(currentPage + 1); });
+
+    goBtn.addEventListener('click', () => {
+        const val = parseInt(pageInput.value);
+        if (!isNaN(val) && val >= 1 && val <= TOTAL_PAGES) {
+            fetchPage(val);
+        } else {
+            showAlert('Такой страницы нет', 'warning');
+        }
+    });
+
+    addStudentBtn.addEventListener('click', () => {
+        const name = newStudentName.value && newStudentName.value.trim();
+        if (!name) { showAlert('Введите ФИО студента', 'warning'); newStudentName.focus(); return; }
+
+        addStudentBtn.disabled = true;
+        const previousBtnText = addStudentBtn.textContent;
+        newStudentName.value = '';
+        newStudentName.focus();
+
+        const body = { studentName: name };
+
+        fetch(`/groups/${encodeURIComponent(GROUP_ID)}/addStudent`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body)
+        })
+            .then(async resp => {
+                if (!resp.ok) {
+                    const txt = await resp.text();
+                    throw new Error(txt || 'Ошибка при добавлении');
+                }
+                return resp.json();
+            })
+            .then(() => {
+                fetchPage(currentPage);
+                showAlert('Студент добавлен', 'success');
+            })
+            .catch(err => {
+                newStudentName.value = name;
+                newStudentName.focus();
+                showAlert('Ошибка: ' + err.message, 'danger');
+            })
+            .finally(() => {
+                addStudentBtn.disabled = false;
+                addStudentBtn.textContent = previousBtnText;
+            });
+    });
+
+    function fetchPage(pageNumber) {
+        return fetch(`/groups/${encodeURIComponent(GROUP_ID)}/getStudents?page=${pageNumber - 1}`)
+            .then(resp => { if (!resp.ok) throw new Error('Не удалось получить студентов'); return resp.json(); })
+            .then(data => {
+                const studentsArray = Array.isArray(data) ? data : (data && Array.isArray(data.students) ? data.students : []);
+                const serverCurrentPage = data && typeof data.currentPage !== 'undefined' ? data.currentPage : pageNumber;
+                const serverTotalPages = data && typeof data.totalPages !== 'undefined' ? data.totalPages : totalPages;
+
+                if ((!studentsArray || studentsArray.length === 0) && pageNumber > 1) {
+                    return fetchPage(pageNumber - 1);
+                }
+
+                renderTable(studentsArray);
+                currentPage = pageNumber;
+                currentPageSpan.textContent = currentPage;
+
+                if (serverTotalPages) {
+                    totalPagesSpan.textContent = serverTotalPages;
+                }
+                updateNavButtons();
+                return data;
+            })
+            .catch(err => {
+                showAlert('Ошибка: ' + err.message, 'danger');
+                throw err;
+            });
+    }
+
+    function formatDate(ts) {
+        if (!ts) return '';
+        const d = (typeof ts === 'number') ? new Date(ts) : new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}.${mm}.${yyyy}`;
+    }
+
+    function renderTable(students) {
+        studentsBody.innerHTML = '';
+
+        const list = Array.isArray(students) ? students : [];
+
+        if (!list || list.length === 0) {
+            studentsBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Студентов нет</td></tr>';
+            return;
+        }
+
+        list.forEach((s, idx) => {
+            const tr = document.createElement('tr');
+
+            const dateTd = document.createElement('td');
+            dateTd.className = 'col-date align-middle text-center';
+            dateTd.textContent = formatDate(s && s.enrollmentDate ? s.enrollmentDate : null);
+
+            const nameTd = document.createElement('td');
+            nameTd.className = 'col-name align-middle';
+            nameTd.textContent = s && s.studentName ? s.studentName : '';
+
+            const actionsTd = document.createElement('td');
+            actionsTd.className = 'col-actions align-middle text-center';
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn btn-sm btn-danger btn-delete-full delete-btn';
+            delBtn.textContent = 'Удалить';
+            if (s && s.studentId) delBtn.setAttribute('data-student-id', s.studentId);
+            actionsTd.appendChild(delBtn);
+
+            tr.append(dateTd, nameTd, actionsTd);
+            studentsBody.appendChild(tr);
+        });
+    }
+
+    function deleteStudent(studentId) {
+        fetch(`/groups/${encodeURIComponent(GROUP_ID)}/deleteStudent?studentId=${encodeURIComponent(studentId)}`, {
+            method: 'DELETE',
+        })
+            .then(async resp => {
+                if (!resp.ok) {
+                    const txt = await resp.text();
+                    throw new Error(txt || 'Ошибка удаления');
+                }
+                return resp.json();
+            })
+            .then(() => {
+                fetchPage(currentPage);
+                showAlert('Студент удалён', 'success');
+            })
+            .catch(err => showAlert('Ошибка: ' + err.message, 'danger'));
+    }
+
+    function updateNavButtons() {
+        prevBtn.disabled = (currentPage <= 1);
+        nextBtn.disabled = (currentPage >= Number(totalPagesSpan.textContent || totalPages));
+    }
+
+    function showAlert(message, type = 'info') {
+        alertPlaceholder.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show mt-2" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+
+        if (alertTimeoutId) {
+            clearTimeout(alertTimeoutId);
+            alertTimeoutId = null;
+        }
+
+        alertTimeoutId = setTimeout(() => {
+            const alertEl = alertPlaceholder.querySelector('.alert');
+            if (!alertEl) { alertTimeoutId = null; return; }
+
+            if (window.bootstrap && bootstrap.Alert && typeof bootstrap.Alert.getOrCreateInstance === 'function') {
+                try {
+                    const bsAlert = bootstrap.Alert.getOrCreateInstance(alertEl);
+                    bsAlert.close();
+                } catch (e) {
+                    alertEl.remove();
+                }
+            } else {
+                alertEl.remove();
+            }
+            alertTimeoutId = null;
+        }, 5000);
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+</body>
+</html>
