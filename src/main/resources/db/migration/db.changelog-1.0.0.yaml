@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1.0.0
+      author: moootvey
+      changes:
+        - createTable:
+            tableName: student_groups
+            columns:
+              - column:
+                  name: group_id
+                  type: varchar(10)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: group_number
+                  type: varchar(10)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: group_created_at
+                  type: timestamp
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createTable:
+            tableName: students
+            columns:
+              - column:
+                  name: student_id
+                  type: varchar(10)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: student_name
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enrollment_date
+                  type: timestamp
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: student_group_id
+                  type: varchar(10)
+                  constraints:
+                    nullable: true
+        - addForeignKeyConstraint:
+            baseTableName: students
+            baseColumnNames: student_group_id
+            referencedTableName: student_groups
+            referencedColumnNames: group_id
+            constraintName: fk_students_groups
